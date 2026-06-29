@@ -238,7 +238,7 @@ export default function FilesScreen({ user, onToggleSidebar }: FilesScreenProps)
                       {file.name}
                     </h4>
                     <p className="text-[10px] text-on-surface-variant font-medium mt-1">
-                      {file.size} • {file.date}
+                      {file.size} | {file.date}
                     </p>
 
                     {/* Badge Pill tags */}
@@ -437,3 +437,4 @@ export default function FilesScreen({ user, onToggleSidebar }: FilesScreenProps)
     </div>
   );
 }
+

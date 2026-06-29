@@ -220,7 +220,7 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
                 <input 
                   className="w-full pl-10 pr-12 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-sm text-on-background focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200 outline-none" 
                   id="password" 
-                  placeholder="••••••••" 
+                  placeholder="********" 
                   required 
                   type={showPassword ? 'text' : 'password'}
                   value={password}
@@ -339,8 +339,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
           <footer className="mt-6 text-center text-[11px] text-on-surface-variant leading-relaxed">
             <p>
-              © 2026 BbduConnect. All rights reserved. <br className="md:hidden" />
-              <a className="hover:text-primary underline underline-offset-4" href="#">Privacy Policy</a> •{' '}
+              (c) 2026 BbduConnect. All rights reserved. <br className="md:hidden" />
+              <a className="hover:text-primary underline underline-offset-4" href="#">Privacy Policy</a>{' | '}
               <a className="hover:text-primary underline underline-offset-4" href="#">Terms of Service</a>
             </p>
           </footer>
@@ -349,3 +349,4 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     </div>
   );
 }
+

@@ -28,7 +28,8 @@ import {
   CheckCircle,
   HelpCircle,
   X,
-  Menu
+  Menu,
+  ArrowLeft
 } from 'lucide-react';
 import { Channel, Message, User as UserType } from '../types';
 import { initialChannels, initialDMs, initialMessages } from '../data';
@@ -49,6 +50,7 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showRightSidebar, setShowRightSidebar] = useState(true);
+  const [showConversationList, setShowConversationList] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -70,6 +72,8 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
     setActiveId(id);
     // Clear unread count when clicked
     setChannels(prev => prev.map(c => c.id === id ? { ...c, unreadCount: 0 } : c));
+    // On mobile, switch to chat view after selecting a conversation
+    setShowConversationList(false);
   };
 
   // Add simulated reply timer for higher fidelity
@@ -231,7 +235,7 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
       <div className="flex-1 flex overflow-hidden">
         
         {/* Pane 1: Conversations List (Channels/DMs) */}
-        <section className="w-[280px] border-r border-outline-variant bg-surface flex flex-col shrink-0">
+        <section className={`border-r border-outline-variant bg-surface flex flex-col shrink-0 ${showConversationList ? 'flex w-full md:w-[280px]' : 'hidden md:flex md:w-[280px]'}`}>
           <div className="p-4 border-b border-outline-variant flex justify-between items-center">
             <h3 className="text-[11px] font-bold text-primary-container tracking-wider uppercase">Channels</h3>
             <button 
@@ -307,10 +311,17 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
         </section>
 
         {/* Pane 2: Main Chat Window */}
-        <section className="flex-1 bg-surface-container-low flex flex-col relative overflow-hidden">
+        <section className={`flex-1 bg-surface-container-low flex-col relative overflow-hidden ${showConversationList ? 'hidden md:flex' : 'flex'}`}>
           {/* Chat Header */}
           <div className="h-16 px-4 md:px-6 border-b border-outline-variant flex items-center justify-between bg-surface/80 backdrop-blur-md sticky top-0 z-10 shrink-0">
             <div className="flex items-center gap-3">
+              {/* Mobile back button to return to conversation list */}
+              <button
+                onClick={() => setShowConversationList(true)}
+                className="md:hidden p-2 text-on-surface-variant hover:text-primary rounded-lg hover:bg-surface-container transition-colors focus:outline-none -ml-1"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
               {activeChannel?.isDM && activeChannel?.avatar ? (
                 <img
                   className="w-8 h-8 rounded-full object-cover shrink-0"
@@ -413,7 +424,7 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-bold text-on-surface truncate">{msg.fileAttachment.name}</p>
-                          <p className="text-[10px] text-on-surface-variant font-semibold">{msg.fileAttachment.size} • PDF Document</p>
+                          <p className="text-[10px] text-on-surface-variant font-semibold">{msg.fileAttachment.size} | PDF Document</p>
                         </div>
                         <Download 
                           onClick={() => alert(`Downloading ${msg.fileAttachment?.name} (Simulated)`)}
@@ -507,7 +518,7 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
                 </button>
                 <div className="w-px h-4 bg-outline-variant mx-1"></div>
                 <button 
-                  onClick={() => setInputText(prev => prev + ' 🎓 ')}
+                  onClick={() => setInputText(prev => prev + ' [campus] ')}
                   className="p-1.5 text-on-surface-variant hover:text-primary rounded-full hover:bg-surface-container transition-colors focus:outline-none" 
                   type="button"
                 >
@@ -563,7 +574,7 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
 
         {/* Pane 3: Channel Info Sidebar */}
         {showRightSidebar && (
-          <section className="w-[300px] border-l border-outline-variant bg-surface flex flex-col shrink-0 overflow-y-auto">
+          <section className="hidden xl:flex w-[300px] border-l border-outline-variant bg-surface flex-col shrink-0 overflow-y-auto">
             {/* Top Identity Block */}
             <div className="p-6 border-b border-outline-variant flex flex-col items-center text-center">
               <div className="w-16 h-16 bg-primary-fixed rounded-2xl flex items-center justify-center text-primary mb-3 shadow-sm">
@@ -571,7 +582,7 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
               </div>
               <h3 className="text-xs font-bold text-on-surface">#{activeChannel?.name}</h3>
               <p className="text-[10px] text-on-surface-variant mt-1">
-                Created by {activeChannel?.isDM ? activeChannel.name : 'Alex Rivera'} • 12 Oct
+                Created by {activeChannel?.isDM ? activeChannel.name : 'Alex Rivera'} | 12 Oct
               </p>
               
               <div className="flex gap-2 mt-4 w-full">
@@ -689,3 +700,4 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
     </div>
   );
 }
+

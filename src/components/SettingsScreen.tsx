@@ -129,7 +129,7 @@ export default function SettingsScreen({ user, onUpdateUser, onLogout, onToggleS
                 <div className="flex-1 space-y-3 text-center sm:text-left min-w-0">
                   <div>
                     <h3 className="text-lg font-bold text-on-background truncate">{user.name}</h3>
-                    <p className="text-xs text-on-surface-variant font-medium">PhD Candidate • Distributed Systems</p>
+                    <p className="text-xs text-on-surface-variant font-medium">PhD Candidate | Distributed Systems</p>
                   </div>
                   <div className="flex flex-wrap gap-1.5 justify-center sm:justify-start">
                     {user.tags?.map((tag, idx) => (
@@ -296,7 +296,7 @@ export default function SettingsScreen({ user, onUpdateUser, onLogout, onToggleS
                   <Laptop className="text-primary-container w-5 h-5" />
                   <div>
                     <p className="text-xs text-on-background font-bold">Current JWT Session</p>
-                    <p className="text-[10px] text-on-surface-variant mt-0.5">Chrome on MacOS • 192.168.1.1</p>
+                    <p className="text-[10px] text-on-surface-variant mt-0.5">Chrome on macOS | 192.168.1.1</p>
                   </div>
                 </div>
                 <button 
@@ -364,3 +364,4 @@ export default function SettingsScreen({ user, onUpdateUser, onLogout, onToggleS
     </div>
   );
 }
+
