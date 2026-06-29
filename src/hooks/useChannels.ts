@@ -12,7 +12,8 @@ import {
   addDoc, 
   serverTimestamp,
   doc,
-  getDoc
+  getDoc,
+  deleteDoc
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase';
 import { Channel, User } from '../types';
@@ -222,5 +223,19 @@ export function useChannels(currentUserId: string | undefined) {
     });
   };
 
-  return { channels, dms, loading, createChannel, createDM };
+  const deleteChannel = async (channelId: string) => {
+    if (!currentUserId) throw new Error('User not logged in');
+
+    if (!isFirebaseConfigured) {
+      const updated = channels.filter(c => c.id !== channelId);
+      localStorage.setItem('mock_channels_list', JSON.stringify(updated));
+      setChannels(updated);
+      window.dispatchEvent(new Event('storage'));
+      return;
+    }
+
+    await deleteDoc(doc(db, 'channels', channelId));
+  };
+
+  return { channels, dms, loading, createChannel, createDM, deleteChannel };
 }

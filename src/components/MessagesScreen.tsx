@@ -44,7 +44,7 @@ interface MessagesScreenProps {
 }
 
 export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreenProps) {
-  const { channels, dms, loading: channelsLoading, createChannel, createDM } = useChannels(user.id);
+  const { channels, dms, loading: channelsLoading, createChannel, createDM, deleteChannel } = useChannels(user.id);
   const [activeId, setActiveId] = useState<string | undefined>(undefined);
   
   const [inputText, setInputText] = useState('');
@@ -206,6 +206,27 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
     } catch (err) {
       console.error(err);
       alert('Failed to initiate direct message.');
+    }
+  };
+
+  const canDelete = !activeChannel?.isDM && (
+    activeChannel?.createdBy === user.id ||
+    user.role === 'ADMIN' || 
+    user.role === 'FACULTY' || 
+    user.role === 'FACULTY ADVISOR'
+  );
+
+  const handleDeleteChannel = async () => {
+    if (!activeId || !activeChannel) return;
+    const confirmDelete = window.confirm(`Are you sure you want to delete the channel #${activeChannel.name}? All chat history will be permanently lost.`);
+    if (confirmDelete) {
+      try {
+        await deleteChannel(activeId);
+        setActiveId(undefined);
+      } catch (err) {
+        console.error(err);
+        alert('Failed to delete channel.');
+      }
     }
   };
 
@@ -686,12 +707,21 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
               </p>
               
               <div className="flex gap-2 mt-4 w-full">
-                <button 
-                  onClick={() => alert('Channel details edit mode is currently restricted.')}
-                  className="flex-1 px-3 py-2 bg-surface-container-low hover:bg-surface-container-high border border-outline-variant rounded-xl text-[11px] font-bold transition-colors focus:outline-none"
-                >
-                  Edit
-                </button>
+                {canDelete ? (
+                  <button 
+                    onClick={handleDeleteChannel}
+                    className="flex-1 px-3 py-2 bg-error text-white hover:bg-error/90 rounded-xl text-[11px] font-bold transition-colors focus:outline-none shadow-sm"
+                  >
+                    Delete Channel
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => alert('Channel details edit mode is currently restricted.')}
+                    className="flex-1 px-3 py-2 bg-surface-container-low hover:bg-surface-container-high border border-outline-variant rounded-xl text-[11px] font-bold transition-colors focus:outline-none"
+                  >
+                    Edit
+                  </button>
+                )}
                 <button 
                   onClick={() => alert(`Unique Share Link: https://bbdu.edu/channel/${activeChannel?.id}`)}
                   className="flex-1 px-3 py-2 bg-surface-container-low hover:bg-surface-container-high border border-outline-variant rounded-xl text-[11px] font-bold transition-colors focus:outline-none"
