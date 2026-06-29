@@ -34,7 +34,7 @@ import {
 import { Channel, Message, User as UserType } from '../types';
 import { useChannels } from '../hooks/useChannels';
 import { useMessages } from '../hooks/useMessages';
-import { formatTime, formatBytes } from '../utils';
+import { formatTime, formatBytes, playNotificationSound } from '../utils';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { storage, db } from '../firebase';
@@ -89,6 +89,8 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
   const [lastViewed, setLastViewed] = useState<Record<string, number>>(() => 
     JSON.parse(localStorage.getItem('chat_last_viewed') || '{}')
   );
+  const [notificationToast, setNotificationToast] = useState<{ title: string; body: string } | null>(null);
+  const prevTimestamps = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (activeId) {
@@ -109,6 +111,68 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
       });
     }
   }, [messages, activeId]);
+
+  // Monitor new unread messages in other channels/DMs for chimes + toasts
+  useEffect(() => {
+    let triggered = false;
+    let toastData: { title: string; body: string } | null = null;
+
+    channels.forEach((chan) => {
+      const prevTime = prevTimestamps.current[chan.id];
+      if (chan.lastMessageAt && prevTime !== undefined && chan.lastMessageAt > prevTime) {
+        const lastViewTime = lastViewed[chan.id] || 0;
+        if (chan.id !== activeId && chan.lastMessageAt > lastViewTime) {
+          triggered = true;
+          toastData = {
+            title: `#${chan.name}`,
+            body: chan.lastMessageSnippet || 'New message arrived.'
+          };
+        }
+      }
+      if (chan.lastMessageAt) {
+        prevTimestamps.current[chan.id] = chan.lastMessageAt;
+      }
+    });
+
+    dms.forEach((dm) => {
+      const prevTime = prevTimestamps.current[dm.id];
+      if (dm.lastMessageAt && prevTime !== undefined && dm.lastMessageAt > prevTime) {
+        const lastViewTime = lastViewed[dm.id] || 0;
+        if (dm.id !== activeId && dm.lastMessageAt > lastViewTime) {
+          triggered = true;
+          toastData = {
+            title: dm.name,
+            body: dm.lastMessageSnippet || 'New direct message.'
+          };
+        }
+      }
+      if (dm.lastMessageAt) {
+        prevTimestamps.current[dm.id] = dm.lastMessageAt;
+      }
+    });
+
+    // Populate initial timestamps on load so we don't trigger chime on startup
+    channels.forEach((chan) => {
+      if (chan.lastMessageAt && prevTimestamps.current[chan.id] === undefined) {
+        prevTimestamps.current[chan.id] = chan.lastMessageAt;
+      }
+    });
+    dms.forEach((dm) => {
+      if (dm.lastMessageAt && prevTimestamps.current[dm.id] === undefined) {
+        prevTimestamps.current[dm.id] = dm.lastMessageAt;
+      }
+    });
+
+    if (triggered && toastData) {
+      playNotificationSound();
+      setNotificationToast(toastData);
+
+      const timeout = setTimeout(() => {
+        setNotificationToast(null);
+      }, 4000);
+      return () => clearTimeout(timeout);
+    }
+  }, [channels, dms, activeId, lastViewed]);
 
   // Handle Channel / DM Selection
   const handleSelectActive = (id: string) => {
@@ -268,7 +332,26 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
   };
 
   return (
-    <div className="md:ml-[280px] h-screen flex flex-col overflow-hidden bg-background">
+    <div className="md:ml-[280px] h-screen flex flex-col overflow-hidden bg-background relative">
+      {/* Floating Notification Toast */}
+      {notificationToast && (
+        <div className="fixed top-4 right-4 bg-surface border border-outline-variant rounded-2xl p-4 shadow-xl z-50 flex items-center gap-3 max-w-sm transition-all duration-300 ease-out">
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white shrink-0 shadow-sm">
+            <Bell className="w-4 h-4 text-white animate-bounce" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold text-on-surface truncate">{notificationToast.title}</p>
+            <p className="text-[10px] text-on-surface-variant truncate mt-0.5 leading-relaxed">{notificationToast.body}</p>
+          </div>
+          <button 
+            onClick={() => setNotificationToast(null)} 
+            className="text-on-surface-variant hover:text-primary transition-colors focus:outline-none p-1 shrink-0 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Hidden File Inputs */}
       <input 
         type="file" 
