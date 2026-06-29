@@ -267,8 +267,8 @@ export default function LoginScreen() {
                 <label className="text-xs font-semibold text-on-surface-variant block">
                   Select Role
                 </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['STUDENT', 'FACULTY', 'ADMIN'] as const).map((r) => (
+                <div className="grid grid-cols-2 gap-2">
+                  {(['STUDENT', 'FACULTY'] as const).map((r) => (
                     <button
                       key={r}
                       type="button"
@@ -279,7 +279,7 @@ export default function LoginScreen() {
                       }`}
                       onClick={() => setRole(r)}
                     >
-                      {r === 'STUDENT' ? 'Student' : r === 'FACULTY' ? 'Faculty' : 'Admin'}
+                      {r === 'STUDENT' ? 'Student' : 'Faculty'}
                     </button>
                   ))}
                 </div>
