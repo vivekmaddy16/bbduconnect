@@ -438,18 +438,6 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
             {activeId && (
               <div className="flex items-center gap-1.5">
                 <button 
-                  onClick={() => alert(`Initiating audio call with ${activeChannel?.name}...`)}
-                  className="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors focus:outline-none"
-                >
-                  <Phone className="w-4 h-4" />
-                </button>
-                <button 
-                  onClick={() => alert(`Starting video seminar on ${activeChannel?.name}...`)}
-                  className="p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors focus:outline-none"
-                >
-                  <Video className="w-4 h-4" />
-                </button>
-                <button 
                   onClick={() => setShowRightSidebar(!showRightSidebar)}
                   className={`p-2 rounded-full transition-colors focus:outline-none ${
                     showRightSidebar ? 'text-primary bg-primary-fixed/20' : 'text-on-surface-variant hover:bg-surface-container-high'
