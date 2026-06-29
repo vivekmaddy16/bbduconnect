@@ -28,7 +28,8 @@ import {
   Menu,
   ArrowLeft,
   Loader2,
-  GraduationCap
+  GraduationCap,
+  Trash2
 } from 'lucide-react';
 import { Channel, Message, User as UserType } from '../types';
 import { useChannels } from '../hooks/useChannels';
@@ -74,7 +75,7 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
     channels.find(c => c.id === activeId) || 
     dms.find(d => d.id === activeId);
 
-  const { messages, loading: messagesLoading, sendMessage } = useMessages(activeId, user);
+  const { messages, loading: messagesLoading, sendMessage, deleteMessage } = useMessages(activeId, user);
 
   // Auto-scroll to bottom of chat
   const scrollToBottom = () => {
@@ -226,6 +227,18 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
       } catch (err) {
         console.error(err);
         alert('Failed to delete channel.');
+      }
+    }
+  };
+
+  const handleDeleteMsg = async (messageId: string) => {
+    const confirmDelete = window.confirm("Are you sure you want to delete this message permanently?");
+    if (confirmDelete) {
+      try {
+        await deleteMessage(messageId);
+      } catch (err) {
+        console.error(err);
+        alert("Failed to delete message.");
       }
     }
   };
@@ -503,6 +516,15 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
                         </span>
                       )}
                       <span className="text-[10px] text-on-surface-variant/70 font-medium">{formatTime(msg.timestamp)}</span>
+                      {(isSelf || user.role === 'ADMIN') && (
+                        <button 
+                          onClick={() => handleDeleteMsg(msg.id)}
+                          className="text-on-surface-variant/50 hover:text-error hover:bg-error/10 p-0.5 rounded transition-colors focus:outline-none ml-1 cursor-pointer"
+                          title="Delete message"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
 
                     {/* Standard Text Bubble */}

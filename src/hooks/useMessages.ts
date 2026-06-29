@@ -12,7 +12,8 @@ import {
   addDoc, 
   updateDoc,
   doc,
-  serverTimestamp 
+  serverTimestamp,
+  deleteDoc
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from '../firebase';
 import { Message, User, AttachmentFile, Channel } from '../types';
@@ -190,5 +191,38 @@ export function useMessages(channelId: string | undefined, currentUserProfile: U
     });
   };
 
-  return { messages, loading, sendMessage };
+  const deleteMessage = async (messageId: string) => {
+    if (!channelId) return;
+
+    if (!isFirebaseConfigured) {
+      const key = `mock_messages_${channelId}`;
+      const currentList = JSON.parse(localStorage.getItem(key) || '[]');
+      const updatedList = currentList.filter((m: Message) => m.id !== messageId);
+      localStorage.setItem(key, JSON.stringify(updatedList));
+      setMessages(updatedList);
+
+      const lastMsg = updatedList[updatedList.length - 1];
+      const snippet = lastMsg ? lastMsg.text || '📎 Sent an attachment' : 'No messages in this chat';
+
+      const updateSnippets = (listKey: string) => {
+        const listJson = localStorage.getItem(listKey);
+        if (listJson) {
+          const list = JSON.parse(listJson);
+          const idx = list.findIndex((c: Channel) => c.id === channelId);
+          if (idx !== -1) {
+            list[idx].lastMessageSnippet = snippet.substring(0, 60);
+            localStorage.setItem(listKey, JSON.stringify(list));
+          }
+        }
+      };
+      updateSnippets('mock_channels_list');
+      updateSnippets('mock_dms_list');
+      window.dispatchEvent(new Event('storage'));
+      return;
+    }
+
+    await deleteDoc(doc(db, 'channels', channelId, 'messages', messageId));
+  };
+
+  return { messages, loading, sendMessage, deleteMessage };
 }
