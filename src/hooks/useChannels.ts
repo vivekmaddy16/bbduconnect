@@ -99,7 +99,8 @@ export function useChannels(currentUserId: string | undefined) {
           description: data.description || '',
           isDM: false,
           avatar: data.avatar || '',
-          unreadCount: 0
+          unreadCount: 0,
+          lastMessageAt: data.lastMessageAt || 0
         });
       });
       setChannels(channelList);
@@ -143,7 +144,8 @@ export function useChannels(currentUserId: string | undefined) {
           avatar: dmAvatar,
           status: dmStatus,
           role: dmRole,
-          lastMessageSnippet: data.lastMessageSnippet || ''
+          lastMessageSnippet: data.lastMessageSnippet || '',
+          lastMessageAt: data.lastMessageAt || 0
         } as Channel;
       });
 

@@ -86,6 +86,30 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
     scrollToBottom();
   }, [messages, activeId]);
 
+  const [lastViewed, setLastViewed] = useState<Record<string, number>>(() => 
+    JSON.parse(localStorage.getItem('chat_last_viewed') || '{}')
+  );
+
+  useEffect(() => {
+    if (activeId) {
+      setLastViewed(prev => {
+        const next = { ...prev, [activeId]: Date.now() };
+        localStorage.setItem('chat_last_viewed', JSON.stringify(next));
+        return next;
+      });
+    }
+  }, [activeId]);
+
+  useEffect(() => {
+    if (activeId && messages.length > 0) {
+      setLastViewed(prev => {
+        const next = { ...prev, [activeId]: Date.now() };
+        localStorage.setItem('chat_last_viewed', JSON.stringify(next));
+        return next;
+      });
+    }
+  }, [messages, activeId]);
+
   // Handle Channel / DM Selection
   const handleSelectActive = (id: string) => {
     setActiveId(id);
@@ -332,6 +356,8 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
             {/* Channels */}
             {channels.map((chan) => {
               const isActive = activeId === chan.id;
+              const lastViewTime = lastViewed[chan.id] || 0;
+              const hasUnread = chan.id !== activeId && chan.lastMessageAt && chan.lastMessageAt > lastViewTime;
               return (
                 <button
                   key={chan.id}
@@ -339,16 +365,16 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
                   className={`w-[calc(100%-16px)] mx-2 flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-all focus:outline-none ${
                     isActive 
                       ? 'bg-surface-container-high text-primary font-bold shadow-sm' 
-                      : 'text-on-surface-variant hover:bg-surface-container-low'
+                      : hasUnread
+                        ? 'text-on-surface font-extrabold'
+                        : 'text-on-surface-variant hover:bg-surface-container-low'
                   }`}
                 >
-                  <Hash className={`w-4 h-4 shrink-0 ${isActive ? 'text-primary' : 'text-on-surface-variant'}`} />
-                  <span className="flex-1 truncate text-xs">{chan.name}</span>
-                  {chan.unreadCount ? (
-                    <span className="bg-primary text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shrink-0">
-                      {chan.unreadCount}
-                    </span>
-                  ) : null}
+                  <Hash className={`w-4 h-4 shrink-0 ${isActive ? 'text-primary' : hasUnread ? 'text-primary font-extrabold animate-pulse' : 'text-on-surface-variant'}`} />
+                  <span className={`flex-1 truncate text-xs ${hasUnread ? 'font-bold text-on-surface' : ''}`}>{chan.name}</span>
+                  {hasUnread && (
+                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0"></span>
+                  )}
                 </button>
               );
             })}
@@ -367,14 +393,18 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
             {/* DMs */}
             {dms.map((dm) => {
               const isActive = activeId === dm.id;
+              const lastViewTime = lastViewed[dm.id] || 0;
+              const hasUnread = dm.id !== activeId && dm.lastMessageAt && dm.lastMessageAt > lastViewTime;
               return (
                 <button
                   key={dm.id}
                   onClick={() => handleSelectActive(dm.id)}
                   className={`w-[calc(100%-16px)] mx-2 flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-all relative focus:outline-none ${
                     isActive 
-                      ? 'bg-surface-container-high font-bold' 
-                      : 'text-on-surface-variant hover:bg-surface-container-low'
+                      ? 'bg-surface-container-high font-bold shadow-sm' 
+                      : hasUnread
+                        ? 'text-on-surface font-extrabold'
+                        : 'text-on-surface-variant hover:bg-surface-container-low'
                   }`}
                 >
                   <div className="relative shrink-0">
@@ -394,9 +424,14 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
                       dm.status === 'active' ? 'bg-secondary' : 'bg-outline-variant'
                     }`}></span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-on-surface truncate">{dm.name}</p>
-                    <p className="text-[10px] text-on-surface-variant truncate font-medium">{dm.lastMessageSnippet}</p>
+                  <div className="flex-1 min-w-0 flex items-center justify-between gap-1">
+                    <div className="truncate">
+                      <p className={`text-xs truncate ${hasUnread ? 'font-extrabold text-primary' : 'font-semibold text-on-surface'}`}>{dm.name}</p>
+                      <p className={`text-[10px] truncate ${hasUnread ? 'font-bold text-on-surface' : 'text-on-surface-variant font-medium'}`}>{dm.lastMessageSnippet}</p>
+                    </div>
+                    {hasUnread && (
+                      <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0"></span>
+                    )}
                   </div>
                 </button>
               );

@@ -31,6 +31,7 @@ export interface Channel {
   members?: string[];
   createdBy?: string;
   createdAt?: any;
+  lastMessageAt?: number;
 }
 
 export interface AttachmentFile {

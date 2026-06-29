@@ -156,6 +156,7 @@ export function useMessages(channelId: string | undefined, currentUserProfile: U
             if (!snippet && fileAttachment) snippet = `📎 ${fileAttachment.name}`;
             else if (!snippet && imageAttachment) snippet = '🖼️ Sent an image';
             list[idx].lastMessageSnippet = snippet.substring(0, 60);
+            list[idx].lastMessageAt = Date.now();
             localStorage.setItem(listKey, JSON.stringify(list));
           }
         }
@@ -187,7 +188,8 @@ export function useMessages(channelId: string | undefined, currentUserProfile: U
       snippet = '🖼️ Sent an image';
     }
     await updateDoc(channelRef, {
-      lastMessageSnippet: snippet.substring(0, 60)
+      lastMessageSnippet: snippet.substring(0, 60),
+      lastMessageAt: Date.now()
     });
   };
 
