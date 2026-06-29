@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Camera, 
   Save, 
@@ -20,18 +20,22 @@ import {
   Check, 
   HelpCircle,
   BellRing,
-  Menu
+  Menu,
+  Loader2
 } from 'lucide-react';
 import { User as UserType } from '../types';
+import { useAuth } from '../contexts/AuthContext';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../firebase';
 
 interface SettingsScreenProps {
   user: UserType;
-  onUpdateUser: (updatedUser: Partial<UserType>) => void;
-  onLogout: () => void;
   onToggleSidebar: () => void;
 }
 
-export default function SettingsScreen({ user, onUpdateUser, onLogout, onToggleSidebar }: SettingsScreenProps) {
+export default function SettingsScreen({ user, onToggleSidebar }: SettingsScreenProps) {
+  const { logout, updateProfile } = useAuth();
+  
   const [fullName, setFullName] = useState(user.name);
   const [bio, setBio] = useState(user.bio || '');
   const [availability, setAvailability] = useState(user.availability);
@@ -41,9 +45,13 @@ export default function SettingsScreen({ user, onUpdateUser, onLogout, onToggleS
   const [msgNotifications, setMsgNotifications] = useState(true);
   const [activitySummary, setActivitySummary] = useState(false);
 
-  // Success toast state
+  // Status flags
   const [showToast, setShowToast] = useState(false);
+  const [isUpdatingAvatar, setIsUpdatingAvatar] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Sync local state when user prop changes (e.g. after re-login)
   useEffect(() => {
@@ -52,27 +60,78 @@ export default function SettingsScreen({ user, onUpdateUser, onLogout, onToggleS
     setAvailability(user.availability);
   }, [user.name, user.bio, user.availability]);
 
-  const handleSaveChanges = () => {
-    onUpdateUser({
-      name: fullName,
-      bio: bio,
-      availability: availability
-    });
+  const handleSaveChanges = async () => {
+    setIsSaving(true);
+    try {
+      await updateProfile({
+        name: fullName,
+        bio: bio,
+        availability: availability
+      });
 
-    // Fire success toast
-    setShowToast(true);
-    setTimeout(() => {
-      setShowToast(false);
-    }, 3000);
+      // Fire success toast
+      setShowToast(true);
+      setTimeout(() => {
+        setShowToast(false);
+      }, 3000);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save profile changes.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleStatusChange = (status: 'Active' | 'Focus Mode' | 'Offline') => {
+  const handleStatusChange = async (status: 'Active' | 'Focus Mode' | 'Offline') => {
     setAvailability(status);
     setShowStatusDropdown(false);
+    try {
+      await updateProfile({ availability: status });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUpdatingAvatar(true);
+    try {
+      const avatarRef = ref(storage, `avatars/${user.id}/profile_${Date.now()}`);
+      const snapshot = await uploadBytes(avatarRef, file);
+      const url = await getDownloadURL(snapshot.ref);
+      
+      await updateProfile({ avatar: url });
+      alert('Profile avatar updated successfully!');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to upload and update profile avatar.');
+    } finally {
+      setIsUpdatingAvatar(false);
+    }
+  };
+
+  const handleSignOutClick = async () => {
+    try {
+      await logout();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to log out.');
+    }
   };
 
   return (
-    <div className="md:ml-[280px] h-screen flex flex-col overflow-hidden bg-background">
+    <div className="md:ml-[280px] h-screen flex flex-col overflow-hidden bg-background text-on-background">
+      {/* Hidden Avatar input file */}
+      <input 
+        type="file" 
+        accept="image/*" 
+        ref={avatarInputRef} 
+        onChange={handleAvatarChange} 
+        className="hidden" 
+      />
+
       {/* Top Bar AppBar */}
       <header className="h-16 bg-surface border-b border-outline-variant flex justify-between items-center px-4 md:px-6 shrink-0 z-20">
         <div className="flex items-center gap-3 md:gap-4 flex-1 max-w-xl">
@@ -94,11 +153,6 @@ export default function SettingsScreen({ user, onUpdateUser, onLogout, onToggleS
             />
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button className="material-symbols-outlined text-on-surface-variant p-2 hover:bg-surface-container rounded-full hover:text-primary transition-colors focus:outline-none">
-            <Bell className="w-5 h-5" />
-          </button>
-        </div>
       </header>
 
       {/* Scrollable setting workspace */}
@@ -112,36 +166,43 @@ export default function SettingsScreen({ user, onUpdateUser, onLogout, onToggleS
             <div className="md:col-span-2 bg-surface border border-outline-variant rounded-xl p-6 shadow-xs relative overflow-hidden">
               <div className="flex flex-col sm:flex-row items-center gap-6 z-10 relative">
                 <div className="relative group shrink-0">
-                  <img 
-                    className="w-24 h-24 rounded-full border-4 border-primary-fixed shadow-md object-cover" 
-                    alt={user.name} 
-                    src={user.avatar} 
-                    referrerPolicy="no-referrer"
-                  />
+                  {user.avatar ? (
+                    <img 
+                      className="w-24 h-24 rounded-full border-4 border-primary-fixed shadow-md object-cover" 
+                      alt={user.name} 
+                      src={user.avatar} 
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full border-4 border-primary-fixed shadow-md bg-primary-container text-on-primary-container font-bold text-3xl flex items-center justify-center">
+                      {user.name.charAt(0)}
+                    </div>
+                  )}
                   <button 
-                    onClick={() => alert('Image uploading simulation activated! (Simulated)')}
-                    className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full border-2 border-white hover:scale-110 transition-transform focus:outline-none"
+                    onClick={() => !isUpdatingAvatar && avatarInputRef.current?.click()}
+                    className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full border-2 border-white hover:scale-110 transition-transform focus:outline-none disabled:opacity-50"
+                    disabled={isUpdatingAvatar}
                   >
-                    <Camera className="w-4 h-4" />
+                    {isUpdatingAvatar ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Camera className="w-4 h-4" />
+                    )}
                   </button>
                 </div>
                 
                 <div className="flex-1 space-y-3 text-center sm:text-left min-w-0">
                   <div>
                     <h3 className="text-lg font-bold text-on-background truncate">{user.name}</h3>
-                    <p className="text-xs text-on-surface-variant font-medium">PhD Candidate | Distributed Systems</p>
+                    <p className="text-xs text-on-surface-variant font-medium">
+                      {user.role} | {user.department || 'Academic Department'}
+                    </p>
                   </div>
                   <div className="flex flex-wrap gap-1.5 justify-center sm:justify-start">
                     {user.tags?.map((tag, idx) => (
                       <span 
                         key={idx} 
-                        className={`px-3 py-0.5 rounded-full text-[10px] font-bold ${
-                          tag === 'Faculty' 
-                            ? 'bg-primary-fixed text-on-primary-fixed' 
-                            : tag === 'Subject Expert' 
-                            ? 'bg-secondary-container text-on-secondary-container' 
-                            : 'bg-tertiary-fixed text-on-tertiary-fixed'
-                        }`}
+                        className="px-3 py-0.5 rounded-full text-[10px] font-bold bg-secondary-container text-on-secondary-container"
                       >
                         {tag}
                       </span>
@@ -193,7 +254,7 @@ export default function SettingsScreen({ user, onUpdateUser, onLogout, onToggleS
                         <button
                           key={st}
                           onClick={() => handleStatusChange(st)}
-                          className="w-full px-3 py-2 text-left text-xs font-semibold rounded-md hover:bg-surface-container-low transition-colors flex items-center justify-between focus:outline-none"
+                          className="w-full px-3 py-2 text-left text-xs font-semibold rounded-md hover:bg-surface-container-low transition-colors flex items-center justify-between focus:outline-none text-on-surface"
                         >
                           <span className="flex items-center gap-2">
                             <span className={`w-2 h-2 rounded-full ${
@@ -201,7 +262,7 @@ export default function SettingsScreen({ user, onUpdateUser, onLogout, onToggleS
                             }`} />
                             {st}
                           </span>
-                          {availability === st && <Check className="w-3.5 h-3.5 text-primary" />}
+                          {availability === st && <Check className="w-4 h-4 text-primary" />}
                         </button>
                       ))}
                     </div>
@@ -211,157 +272,113 @@ export default function SettingsScreen({ user, onUpdateUser, onLogout, onToggleS
             </div>
           </section>
 
-          {/* Personal Information Grid */}
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Bento-style details configuration grid */}
+          <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            {/* Basic Info input card */}
-            <div className="bg-surface border border-outline-variant rounded-xl p-6 shadow-xs space-y-4">
-              <h4 className="text-xs font-bold text-on-background flex items-center gap-2 uppercase tracking-wider">
-                <User className="text-primary w-4 h-4" />
+            {/* Profile Fields updates */}
+            <div className="md:col-span-2 bg-surface border border-outline-variant rounded-xl p-6 shadow-xs space-y-4">
+              <h3 className="text-sm font-bold text-primary flex items-center gap-2">
+                <User className="w-5 h-5" />
                 Personal Information
-              </h4>
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-on-surface-variant">Full Name</label>
+              </h3>
+              
+              <div className="grid grid-cols-1 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-on-surface-variant block">Full Name</label>
                   <input 
-                    className="w-full bg-surface-container-low border border-outline-variant rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-primary focus:border-primary outline-none" 
                     type="text" 
+                    className="w-full bg-surface-container-low border border-outline-variant rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-primary focus:border-primary outline-none text-on-surface"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-on-surface-variant">Academic Bio</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-on-surface-variant block">Biography</label>
                   <textarea 
-                    className="w-full bg-surface-container-low border border-outline-variant rounded-lg p-2.5 text-xs font-medium focus:ring-2 focus:ring-primary focus:border-primary resize-none outline-none" 
-                    rows={3}
+                    rows={4}
+                    className="w-full bg-surface-container-low border border-outline-variant rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-primary focus:border-primary outline-none text-on-surface resize-none"
+                    placeholder="Tell your academic peers about yourself..."
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
                   />
                 </div>
               </div>
-            </div>
 
-            {/* Notification Preferences */}
-            <div className="bg-surface border border-outline-variant rounded-xl p-6 shadow-xs space-y-4">
-              <h4 className="text-xs font-bold text-on-background flex items-center gap-2 uppercase tracking-wider">
-                <BellRing className="text-primary w-4 h-4" />
-                Notification Preferences
-              </h4>
-              
-              <div className="space-y-4 divide-y divide-outline-variant/30">
-                {/* Switch 1 */}
-                <div className="flex items-center justify-between py-1">
-                  <div className="max-w-[75%]">
-                    <p className="text-xs text-on-background font-bold">Message Notifications</p>
-                    <p className="text-[10px] text-on-surface-variant mt-0.5">Receive real-time sound and banner alerts for new research chat lines.</p>
-                  </div>
-                  <button 
-                    onClick={() => setMsgNotifications(!msgNotifications)}
-                    className={`w-10 h-6 rounded-full p-0.5 transition-colors focus:outline-none ${msgNotifications ? 'bg-primary' : 'bg-surface-container-highest'}`}
-                    type="button"
-                  >
-                    <div className={`w-5 h-5 bg-white rounded-full shadow-sm transform transition-transform ${msgNotifications ? 'translate-x-4' : 'translate-x-0'}`} />
-                  </button>
-                </div>
-
-                {/* Switch 2 */}
-                <div className="flex items-center justify-between pt-3">
-                  <div className="max-w-[75%]">
-                    <p className="text-xs text-on-background font-bold">Activity Summary Digest</p>
-                    <p className="text-[10px] text-on-surface-variant mt-0.5">Opt into receiving a curated weekly digest of publications and academic files.</p>
-                  </div>
-                  <button 
-                    onClick={() => setActivitySummary(!activitySummary)}
-                    className={`w-10 h-6 rounded-full p-0.5 transition-colors focus:outline-none ${activitySummary ? 'bg-primary' : 'bg-surface-container-highest'}`}
-                    type="button"
-                  >
-                    <div className={`w-5 h-5 bg-white rounded-full shadow-sm transform transition-transform ${activitySummary ? 'translate-x-4' : 'translate-x-0'}`} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Privacy & Active Sessions (JWT Focus) */}
-          <section className="bg-surface border border-outline-variant rounded-xl p-6 shadow-xs space-y-4">
-            <h4 className="text-xs font-bold text-on-background flex items-center gap-2 uppercase tracking-wider">
-              <Lock className="text-primary w-4 h-4" />
-              Privacy & Active Sessions
-            </h4>
-            
-            <div className="space-y-4">
-              <div className="p-3 bg-surface-container-low border border-outline-variant rounded-lg flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <Laptop className="text-primary-container w-5 h-5" />
-                  <div>
-                    <p className="text-xs text-on-background font-bold">Current JWT Session</p>
-                    <p className="text-[10px] text-on-surface-variant mt-0.5">Chrome on macOS | 192.168.1.1</p>
-                  </div>
-                </div>
+              <div className="pt-2 flex justify-end">
                 <button 
-                  onClick={() => alert('Simulated Session Revocation: Token invalidated.')}
-                  className="px-3 py-1 bg-error-container text-on-error-container hover:bg-error hover:text-white rounded-lg text-xs font-bold transition-colors focus:outline-none"
-                  type="button"
+                  onClick={handleSaveChanges}
+                  disabled={isSaving}
+                  className="px-5 py-2.5 bg-primary disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center gap-2 shadow-md hover:bg-primary/95 transition-all active:scale-95 focus:outline-none"
                 >
-                  Revoke Session
+                  {isSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4" />
+                  )}
+                  Save Changes
                 </button>
               </div>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                <div className="flex items-start gap-3">
-                  <Clock className="text-on-tertiary-container w-5 h-5 shrink-0" />
-                  <div>
-                    <p className="text-xs text-on-background font-bold">Auto-Logout Timer</p>
-                    <p className="text-[10px] text-on-surface-variant leading-relaxed mt-0.5">
-                      Automatically invalidates JWT tokens and requires re-authentication after 24 hours of inactivity.
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <EyeOff className="text-on-secondary-container w-5 h-5 shrink-0" />
-                  <div>
-                    <p className="text-xs text-on-background font-bold">Profile Privacy Shield</p>
-                    <p className="text-[10px] text-on-surface-variant leading-relaxed mt-0.5">
-                      Restrict students and non-verified visitors from auditing your unpublished drafts and notes in the vaults.
-                    </p>
-                  </div>
+            {/* Notification and Preferences settings block */}
+            <div className="bg-surface border border-outline-variant rounded-xl p-6 shadow-xs flex flex-col justify-between">
+              <div className="space-y-6">
+                <h3 className="text-sm font-bold text-primary flex items-center gap-2">
+                  <Bell className="w-5 h-5" />
+                  Preferences
+                </h3>
+
+                <div className="space-y-4">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <div>
+                      <p className="text-xs font-bold text-on-surface">Message Notifications</p>
+                      <p className="text-[10px] text-on-surface-variant mt-0.5">Alert on direct messages</p>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 text-primary bg-surface-container border-outline-variant rounded focus:ring-primary"
+                      checked={msgNotifications}
+                      onChange={(e) => setMsgNotifications(e.target.checked)}
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <div>
+                      <p className="text-xs font-bold text-on-surface">Activity Summaries</p>
+                      <p className="text-[10px] text-on-surface-variant mt-0.5">Weekly email brief</p>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 text-primary bg-surface-container border-outline-variant rounded focus:ring-primary"
+                      checked={activitySummary}
+                      onChange={(e) => setActivitySummary(e.target.checked)}
+                    />
+                  </label>
                 </div>
               </div>
-            </div>
-          </section>
 
-          {/* Footer Actions */}
-          <section className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
-            <button 
-              onClick={handleSaveChanges}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white hover:opacity-90 active:scale-95 transition-all rounded-xl text-xs font-bold shadow-md focus:outline-none"
-            >
-              <Save className="w-4 h-4" />
-              Save Changes
-            </button>
-            <button 
-              onClick={onLogout}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 text-error border border-error-container rounded-xl text-xs font-bold hover:bg-error-container transition-all active:scale-95 focus:outline-none"
-            >
-              <LogOut className="w-4 h-4" />
-              Log Out
-            </button>
+              <div className="pt-6 border-t border-outline-variant/30 mt-6">
+                <button 
+                  onClick={handleSignOutClick}
+                  className="w-full py-2.5 border border-error text-error hover:bg-error-container hover:text-on-error-container rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-colors focus:outline-none"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Log Out
+                </button>
+              </div>
+            </div>
           </section>
 
         </div>
       </div>
 
-      {/* Floating Toast Notification */}
-      <div 
-        className={`fixed bottom-6 right-6 bg-inverse-surface text-inverse-on-surface px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 transition-all duration-500 z-50 ${
-          showToast ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'
-        }`}
-      >
-        <CheckCircle className="text-secondary w-5 h-5" />
-        <p className="text-xs font-bold">Settings updated successfully</p>
-      </div>
+      {/* Floating Success Toast notification */}
+      {showToast && (
+        <div className="fixed bottom-6 right-6 bg-secondary text-on-secondary px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 border border-secondary border-opacity-20 animate-fade-in z-50">
+          <CheckCircle className="w-5 h-5 text-on-secondary" />
+          <span className="text-xs font-bold">Profile updated successfully!</span>
+        </div>
+      )}
     </div>
   );
 }
-

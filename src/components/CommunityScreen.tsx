@@ -16,10 +16,12 @@ import {
   Tag, 
   X,
   FileText,
-  Menu
+  Menu,
+  Loader2
 } from 'lucide-react';
 import { CommunityPost, User } from '../types';
-import { initialPosts } from '../data';
+import { usePosts, usePostComments } from '../hooks/usePosts';
+import { formatTime } from '../utils';
 
 interface CommunityScreenProps {
   user: User;
@@ -27,30 +29,14 @@ interface CommunityScreenProps {
 }
 
 export default function CommunityScreen({ user, onToggleSidebar }: CommunityScreenProps) {
-  const [posts, setPosts] = useState<CommunityPost[]>(initialPosts);
+  const { posts, loading, createPost, toggleLikePost } = usePosts(user);
+  
   const [newPostText, setNewPostText] = useState('');
   const [newPostTag, setNewPostTag] = useState('');
   const [postTagsList, setPostTagsList] = useState<string[]>(['Research']);
   
-  // Comment threads mapping: postId -> list of comment strings
-  const [commentsMap, setCommentsMap] = useState<Record<string, { author: string; text: string }[]>>({
-    post_1: [
-      { author: 'Marcus Chen', text: "I'll definitely be submitting an abstract for my Distributed systems project, Dr. Miller!" },
-      { author: 'David R.', text: "Excellent, looking forward to the keynote!" }
-    ],
-    post_2: [
-      { author: 'Dr. Sarah Miller', text: "Excellent choice of clustering library, Marcus. I would love to look at the latency benchmark." }
-    ]
-  });
-
   const [activeCommentPostId, setActiveCommentPostId] = useState<string | null>(null);
-  const [commentInput, setCommentInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Handle Like Increment
-  const handleLike = (postId: string) => {
-    setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes: p.likes + 1 } : p));
-  };
 
   // Add tag to list
   const handleAddTag = () => {
@@ -68,43 +54,21 @@ export default function CommunityScreen({ user, onToggleSidebar }: CommunityScre
   };
 
   // Publish a new post
-  const handleCreatePost = (e: React.FormEvent) => {
+  const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPostText.trim()) return;
 
-    const publishedPost: CommunityPost = {
-      id: `post_${Date.now()}`,
-      author: user.name,
-      authorAvatar: user.avatar,
-      authorRole: user.role,
-      content: newPostText,
-      timestamp: 'Just now',
-      likes: 0,
-      comments: 0,
-      tags: postTagsList.length > 0 ? postTagsList : ['Academic']
-    };
-
-    setPosts(prev => [publishedPost, ...prev]);
-    setNewPostText('');
-    setPostTagsList(['Research']); // Reset to default tag
-  };
-
-  // Add Comment under active post
-  const handleAddComment = (postId: string) => {
-    if (!commentInput.trim()) return;
-    
-    const newComment = {
-      author: user.name,
-      text: commentInput.trim()
-    };
-
-    setCommentsMap(prev => ({
-      ...prev,
-      [postId]: [...(prev[postId] || []), newComment]
-    }));
-
-    setPosts(prev => prev.map(p => p.id === postId ? { ...p, comments: p.comments + 1 } : p));
-    setCommentInput('');
+    try {
+      await createPost(
+        newPostText.trim(),
+        postTagsList.length > 0 ? postTagsList : ['Academic']
+      );
+      setNewPostText('');
+      setPostTagsList(['Research']); // Reset to default tag
+    } catch (err) {
+      console.error(err);
+      alert('Failed to publish post.');
+    }
   };
 
   // Filter posts by search query
@@ -151,12 +115,18 @@ export default function CommunityScreen({ user, onToggleSidebar }: CommunityScre
           {/* New Post / Publication Composer Card */}
           <form onSubmit={handleCreatePost} className="bg-surface border border-outline-variant rounded-xl p-5 shadow-sm space-y-4">
             <div className="flex items-start gap-3">
-              <img 
-                className="w-10 h-10 rounded-full object-cover shrink-0 border border-outline-variant" 
-                alt={user.name} 
-                src={user.avatar} 
-                referrerPolicy="no-referrer"
-              />
+              {user.avatar ? (
+                <img 
+                  className="w-10 h-10 rounded-full object-cover shrink-0 border border-outline-variant" 
+                  alt={user.name} 
+                  src={user.avatar} 
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container font-bold text-xs flex items-center justify-center border border-outline-variant shrink-0">
+                  {user.name.charAt(0)}
+                </div>
+              )}
               <div className="flex-1">
                 <textarea 
                   className="w-full bg-transparent border-none text-xs text-on-background focus:ring-0 resize-none outline-none min-h-[60px]" 
@@ -227,128 +197,183 @@ export default function CommunityScreen({ user, onToggleSidebar }: CommunityScre
 
           {/* Staggered Community feed list */}
           <div className="space-y-6">
-            {filteredPosts.map((post) => (
-              <div key={post.id} className="bg-surface border border-outline-variant rounded-xl p-5 shadow-xs space-y-4">
-                
-                {/* Author profile block */}
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <img 
-                      className="w-10 h-10 rounded-full object-cover border border-outline-variant" 
-                      alt={post.author} 
-                      src={post.authorAvatar} 
-                      referrerPolicy="no-referrer"
-                    />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-xs font-bold text-on-surface">{post.author}</h4>
-                        <span className="bg-primary-fixed/40 text-on-primary-fixed-variant text-[9px] font-bold px-1.5 rounded uppercase">
-                          {post.authorRole}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-on-surface-variant font-medium mt-0.5">{post.timestamp}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* content text */}
-                <p className="text-xs text-on-surface leading-relaxed whitespace-pre-wrap">
-                  {post.content}
-                </p>
-
-                {/* post tags */}
-                {post.tags && post.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {post.tags.map(t => (
-                      <span key={t} className="bg-surface-container-high text-on-surface-variant text-[10px] font-bold px-2 py-0.5 rounded-full">
-                        #{t}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Interact action buttons */}
-                <div className="flex items-center justify-between border-t border-outline-variant/30 pt-3 text-on-surface-variant">
-                  <div className="flex items-center gap-4">
-                    {/* Like button */}
-                    <button 
-                      onClick={() => handleLike(post.id)}
-                      className="flex items-center gap-1 text-[11px] font-semibold hover:text-error transition-colors focus:outline-none bg-transparent border-none cursor-pointer"
-                    >
-                      <Heart className="w-4 h-4 text-error/80" fill="none" />
-                      <span>{post.likes} Likes</span>
-                    </button>
-
-                    {/* Comments toggle button */}
-                    <button 
-                      onClick={() => setActiveCommentPostId(activeCommentPostId === post.id ? null : post.id)}
-                      className={`flex items-center gap-1 text-[11px] font-semibold hover:text-primary transition-colors focus:outline-none bg-transparent border-none cursor-pointer ${
-                        activeCommentPostId === post.id ? 'text-primary' : ''
-                      }`}
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                      <span>{post.comments} Comments</span>
-                    </button>
-                  </div>
-
-                  <button 
-                    onClick={() => alert(`Unique post link copied for ${post.author}'s post`)}
-                    className="p-1 text-on-surface-variant hover:text-primary rounded-full transition-colors focus:outline-none"
-                  >
-                    <Share2 className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* Expanded Comment Tray Section */}
-                {activeCommentPostId === post.id && (
-                  <div className="bg-surface-container-low rounded-xl p-4 border border-outline-variant/40 space-y-4">
-                    <h5 className="text-[11px] font-bold text-primary uppercase">Academic Discussion</h5>
+            {loading ? (
+              <div className="flex flex-col items-center py-12">
+                <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                <p className="text-xs font-semibold text-on-surface-variant mt-2">Loading bulletin feed...</p>
+              </div>
+            ) : filteredPosts.length === 0 ? (
+              <div className="text-center py-12 bg-surface border border-outline-variant rounded-xl">
+                <p className="text-xs text-on-surface-variant font-medium">No updates posted yet.</p>
+                <p className="text-[10px] text-on-surface-variant/70 mt-1">Publish the first symposium thread!</p>
+              </div>
+            ) : (
+              filteredPosts.map((post) => {
+                const isLiked = post.likedBy?.includes(user.id) || false;
+                return (
+                  <div key={post.id} className="bg-surface border border-outline-variant rounded-xl p-5 shadow-xs space-y-4">
                     
-                    {/* List of comments */}
-                    <div className="space-y-3 divide-y divide-outline-variant/20">
-                      {commentsMap[post.id]?.map((cmt, cIdx) => (
-                        <div key={cIdx} className={`text-[11px] leading-relaxed pt-2 ${cIdx === 0 ? 'pt-0' : ''}`}>
-                          <p className="font-bold text-on-surface">{cmt.author}</p>
-                          <p className="text-on-surface-variant mt-0.5">{cmt.text}</p>
+                    {/* Author profile block */}
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        {post.authorAvatar ? (
+                          <img 
+                            className="w-10 h-10 rounded-full object-cover border border-outline-variant" 
+                            alt={post.author} 
+                            src={post.authorAvatar} 
+                            referrerPolicy="no-referrer"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-primary-container text-on-primary-container text-xs font-bold flex items-center justify-center border border-outline-variant">
+                            {post.author.charAt(0)}
+                          </div>
+                        )}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-bold text-on-surface">{post.author}</h4>
+                            <span className="bg-primary-fixed/30 text-on-primary-fixed-variant text-[9px] font-bold px-1.5 rounded uppercase font-sans">
+                              {post.authorRole}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-on-surface-variant font-medium mt-0.5">{formatTime(post.timestamp)}</p>
                         </div>
-                      ))}
-                      {(!commentsMap[post.id] || commentsMap[post.id].length === 0) && (
-                        <p className="text-[10px] text-on-surface-variant">No comments published yet.</p>
-                      )}
+                      </div>
                     </div>
 
-                    {/* Comment composer */}
-                    <div className="flex gap-2 items-center bg-surface border border-outline-variant rounded-lg p-1.5 focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all">
-                      <input 
-                        type="text" 
-                        placeholder="Write a peer response..." 
-                        className="bg-transparent border-none focus:ring-0 text-xs flex-1 outline-none font-medium px-2 py-1 text-on-surface"
-                        value={commentInput}
-                        onChange={(e) => setCommentInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddComment(post.id);
-                          }
-                        }}
-                      />
+                    {/* content text */}
+                    <p className="text-xs text-on-surface leading-relaxed whitespace-pre-wrap">
+                      {post.content}
+                    </p>
+
+                    {/* post tags */}
+                    {post.tags && post.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {post.tags.map(t => (
+                          <span key={t} className="bg-surface-container-high text-on-surface-variant text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            #{t}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Interact action buttons */}
+                    <div className="flex items-center justify-between border-t border-outline-variant/30 pt-3 text-on-surface-variant">
+                      <div className="flex items-center gap-4">
+                        {/* Like button */}
+                        <button 
+                          onClick={() => toggleLikePost(post.id, isLiked)}
+                          className={`flex items-center gap-1 text-[11px] font-semibold hover:text-error transition-colors focus:outline-none bg-transparent border-none cursor-pointer ${
+                            isLiked ? 'text-error font-bold' : ''
+                          }`}
+                        >
+                          <Heart className={`w-4 h-4 ${isLiked ? 'text-error fill-error' : 'text-on-surface-variant/80'}`} />
+                          <span>{post.likes} Likes</span>
+                        </button>
+
+                        {/* Comments toggle button */}
+                        <button 
+                          onClick={() => setActiveCommentPostId(activeCommentPostId === post.id ? null : post.id)}
+                          className={`flex items-center gap-1 text-[11px] font-semibold hover:text-primary transition-colors focus:outline-none bg-transparent border-none cursor-pointer ${
+                            activeCommentPostId === post.id ? 'text-primary font-bold' : ''
+                          }`}
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          <span>{post.comments} Comments</span>
+                        </button>
+                      </div>
+
                       <button 
-                        onClick={() => handleAddComment(post.id)}
-                        disabled={!commentInput.trim()}
-                        className="p-1.5 bg-primary text-white hover:bg-primary-container disabled:opacity-50 rounded-md focus:outline-none"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`https://bbduconnect.edu/post/${post.id}`);
+                          alert("Post link copied to clipboard!");
+                        }}
+                        className="p-1 text-on-surface-variant hover:text-primary rounded-full transition-colors focus:outline-none"
                       >
-                        <Send className="w-3.5 h-3.5" />
+                        <Share2 className="w-4 h-4" />
                       </button>
                     </div>
-                  </div>
-                )}
 
-              </div>
-            ))}
+                    {/* Expanded Comment Tray Section */}
+                    {activeCommentPostId === post.id && (
+                      <CommentTray postId={post.id} user={user} />
+                    )}
+
+                  </div>
+                );
+              })
+            )}
           </div>
 
         </div>
       </main>
+    </div>
+  );
+}
+
+interface CommentTrayProps {
+  postId: string;
+  user: User;
+}
+
+function CommentTray({ postId, user }: CommentTrayProps) {
+  const { comments, loading, addComment } = usePostComments(postId, user);
+  const [commentInput, setCommentInput] = useState('');
+
+  const handleAddCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentInput.trim()) return;
+
+    try {
+      await addComment(commentInput.trim());
+      setCommentInput('');
+    } catch (err) {
+      console.error(err);
+      alert('Failed to publish peer response.');
+    }
+  };
+
+  return (
+    <div className="bg-surface-container-low rounded-xl p-4 border border-outline-variant/40 space-y-4">
+      <h5 className="text-[11px] font-bold text-primary uppercase">Academic Discussion</h5>
+      
+      {/* List of comments */}
+      <div className="space-y-3 divide-y divide-outline-variant/20 max-h-60 overflow-y-auto pr-1">
+        {loading && (
+          <div className="flex justify-center p-2">
+            <Loader2 className="w-4 h-4 text-primary animate-spin" />
+          </div>
+        )}
+        {comments.map((cmt) => (
+          <div key={cmt.id} className="text-[11px] leading-relaxed pt-2 first:pt-0 text-on-surface">
+            <div className="flex items-center gap-1.5 font-bold text-on-surface">
+              <span>{cmt.author}</span>
+              <span className="text-[9px] text-on-surface-variant font-medium">({formatTime(cmt.timestamp)})</span>
+            </div>
+            <p className="text-on-surface-variant mt-0.5">{cmt.text}</p>
+          </div>
+        ))}
+        {!loading && comments.length === 0 && (
+          <p className="text-[10px] text-on-surface-variant">No comments published yet.</p>
+        )}
+      </div>
+
+      {/* Comment composer */}
+      <form onSubmit={handleAddCommentSubmit} className="flex gap-2 items-center bg-surface border border-outline-variant rounded-lg p-1.5 focus-within:ring-2 focus-within:ring-primary focus-within:border-transparent transition-all">
+        <input 
+          type="text" 
+          placeholder="Write a peer response..." 
+          className="bg-transparent border-none focus:ring-0 text-xs flex-1 outline-none font-medium px-2 py-1 text-on-surface"
+          value={commentInput}
+          onChange={(e) => setCommentInput(e.target.value)}
+        />
+        <button 
+          type="submit"
+          disabled={!commentInput.trim()}
+          className="p-1.5 bg-primary text-white hover:bg-primary-container disabled:opacity-50 rounded-md focus:outline-none"
+        >
+          <Send className="w-3.5 h-3.5" />
+        </button>
+      </form>
     </div>
   );
 }

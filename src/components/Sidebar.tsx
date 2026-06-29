@@ -14,6 +14,7 @@ import {
   X
 } from 'lucide-react';
 import { AppView, User as UserType } from '../types';
+import { isFirebaseConfigured } from '../firebase';
 
 interface SidebarProps {
   currentView: AppView;
@@ -51,7 +52,14 @@ export default function Sidebar({ currentView, onViewChange, user, isOpen, onClo
               <GraduationCap className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-primary tracking-tight">BbduConnect</h1>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h1 className="text-sm font-bold text-primary tracking-tight">BbduConnect</h1>
+                {!isFirebaseConfigured && (
+                  <span className="text-[8px] leading-none bg-amber-500/25 text-amber-500 border border-amber-500/20 font-extrabold px-1 py-0.5 rounded tracking-wide uppercase">
+                    Demo Mode
+                  </span>
+                )}
+              </div>
               <p className="text-[10px] font-semibold text-on-surface-variant uppercase tracking-wider">Academic Hub</p>
             </div>
           </div>

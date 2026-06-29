@@ -4,57 +4,45 @@
  */
 
 import React, { useState } from 'react';
-import { User, AppView } from './types';
-import { currentUser } from './data';
+import { AppView } from './types';
+import { useAuth } from './contexts/AuthContext';
 import LoginScreen from './components/LoginScreen';
 import Sidebar from './components/Sidebar';
 import MessagesScreen from './components/MessagesScreen';
 import FilesScreen from './components/FilesScreen';
 import CommunityScreen from './components/CommunityScreen';
 import SettingsScreen from './components/SettingsScreen';
+import { Loader2 } from 'lucide-react';
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [user, setUser] = useState<User>(currentUser);
+  const { user, userProfile, loading } = useAuth();
   const [currentView, setCurrentView] = useState<AppView>('messages');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
-
-  // Handle successful login
-  const handleLoginSuccess = (loginUser: Partial<User>) => {
-    setUser(prev => ({
-      ...prev,
-      ...loginUser
-    }));
-    setIsAuthenticated(true);
-    setCurrentView('messages');
-  };
-
-  // Handle user logout
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setSidebarOpen(false);
-  };
-
-  // Handle user metadata update (e.g. from Settings tab)
-  const handleUpdateUser = (updatedUserFields: Partial<User>) => {
-    setUser(prev => ({
-      ...prev,
-      ...updatedUserFields
-    }));
-  };
 
   const handleToggleSidebar = () => {
     setSidebarOpen(prev => !prev);
   };
 
-  // Close sidebar when view changes on mobile
   const handleViewChange = (view: AppView) => {
     setCurrentView(view);
     setSidebarOpen(false);
   };
 
-  if (!isAuthenticated) {
-    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+  // Show premium loading spinner while Firebase Auth is initializing
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-surface flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+        <p className="text-sm font-semibold text-on-surface-variant animate-pulse">
+          Initializing BbduConnect Secure Session...
+        </p>
+      </div>
+    );
+  }
+
+  // If user or their Firestore profile isn't loaded, show the login/signup screen
+  if (!user || !userProfile) {
+    return <LoginScreen />;
   }
 
   return (
@@ -63,7 +51,7 @@ export default function App() {
       <Sidebar 
         currentView={currentView} 
         onViewChange={handleViewChange} 
-        user={user}
+        user={userProfile}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
@@ -71,19 +59,17 @@ export default function App() {
       {/* Main app panels based on view selection */}
       <div className="flex-1 min-w-0 h-screen overflow-hidden">
         {currentView === 'messages' && (
-          <MessagesScreen user={user} onToggleSidebar={handleToggleSidebar} />
+          <MessagesScreen user={userProfile} onToggleSidebar={handleToggleSidebar} />
         )}
         {currentView === 'files' && (
-          <FilesScreen user={user} onToggleSidebar={handleToggleSidebar} />
+          <FilesScreen user={userProfile} onToggleSidebar={handleToggleSidebar} />
         )}
         {currentView === 'community' && (
-          <CommunityScreen user={user} onToggleSidebar={handleToggleSidebar} />
+          <CommunityScreen user={userProfile} onToggleSidebar={handleToggleSidebar} />
         )}
         {currentView === 'settings' && (
           <SettingsScreen 
-            user={user} 
-            onUpdateUser={handleUpdateUser} 
-            onLogout={handleLogout}
+            user={userProfile} 
             onToggleSidebar={handleToggleSidebar}
           />
         )}
