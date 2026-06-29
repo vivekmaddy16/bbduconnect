@@ -435,7 +435,7 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
                 </p>
               </div>
             </div>
-            {activeId && (
+            {activeId && user.role === 'ADMIN' && (
               <div className="flex items-center gap-1.5">
                 <button 
                   onClick={() => setShowRightSidebar(!showRightSidebar)}
@@ -702,7 +702,7 @@ export default function MessagesScreen({ user, onToggleSidebar }: MessagesScreen
         </section>
 
         {/* Pane 3: Channel Info Sidebar */}
-        {activeId && showRightSidebar && (
+        {activeId && showRightSidebar && user.role === 'ADMIN' && (
           <section className="hidden xl:flex w-[300px] border-l border-outline-variant bg-surface flex-col shrink-0 overflow-y-auto">
             {/* Top Identity Block */}
             <div className="p-6 border-b border-outline-variant flex flex-col items-center text-center">
